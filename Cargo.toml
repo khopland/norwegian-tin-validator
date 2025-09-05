@@ -9,5 +9,5 @@ readme = "README.md"
 license = "Apache-2.0"
 repository = "https://github.com/khopland/norwegian-tin-validator"
 description = "A Norwegian TIN (Tax Identification Number) validator library"
-keywords = ["validator", "norwegian", "tin", "d-number", "f-number", "fødselsnummer", "personnummer"]
+keywords = ["id-validator", "norwegian", "tin", "id", "fnr"]
 [dependencies]
