@@ -251,7 +251,7 @@ mod test {
     pub use super::*;
     #[test]
     fn test_invalid_length() {
-        let tins = vec!["0123456789", "123456789012", "123", "12345678",""];
+        let tins = vec!["0123456789", "123456789012", "123", "12345678", ""];
         for tin in tins {
             assert_eq!(
                 NorwegianTin::parse(tin).unwrap_err(),
@@ -639,5 +639,4 @@ mod test {
             );
         }
     }
-
 }
