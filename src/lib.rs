@@ -4,6 +4,8 @@ use std::str::FromStr;
 const SEQUENCE_FIRST_CHECKSUM_DIGITS: &'static [u8; 9] = &[3, 7, 6, 1, 8, 9, 4, 5, 2];
 const SEQUENCE_SECOND_CHECKSUM_DIGITS: &'static [u8; 10] = &[5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
 const TIN_LENGTH: usize = 11;
+const ORG_LENGTH: usize = 9;
+const SEQUENCE_ORG_CHECKSUM_DIGITS: &'static [u8; 8] = &[3, 2, 7, 6, 5, 4, 3, 2];
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 #[non_exhaustive]
@@ -21,11 +23,16 @@ pub struct PersonNumber {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub struct OrgNumber {
+    value: [u8; ORG_LENGTH],
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 #[non_exhaustive]
 pub enum NorwegianTin {
     FNumber(PersonNumber),
     DNumber(PersonNumber),
-    // OrgNumber(OrgKind),
+    OrgNumber(OrgNumber),
 }
 
 #[derive(Debug, PartialEq)]
@@ -62,8 +69,8 @@ impl Into<String> for NorwegianTin {
     }
 }
 
-impl AsRef<[u8; TIN_LENGTH]> for NorwegianTin {
-    fn as_ref(&self) -> &[u8; TIN_LENGTH] {
+impl AsRef<[u8]> for NorwegianTin {
+    fn as_ref(&self) -> &[u8] {
         self.get_value()
     }
 }
@@ -82,24 +89,27 @@ impl std::fmt::Display for NorwegianTin {
     }
 }
 impl NorwegianTin {
-    pub fn get_value(&self) -> &[u8; TIN_LENGTH] {
+    pub fn get_value(&self) -> &[u8] {
         match self {
             NorwegianTin::FNumber(fnr) => &fnr.value,
             NorwegianTin::DNumber(dnr) => &dnr.value,
+            NorwegianTin::OrgNumber(org) => &org.value,
         }
     }
     pub fn get_kind(&self) -> PersonKind {
         match self {
             NorwegianTin::FNumber(fnr) => fnr.kind,
             NorwegianTin::DNumber(dnr) => dnr.kind,
+            NorwegianTin::OrgNumber(_) => PersonKind::Normal, // Org numbers are not categorized by kind
         }
     }
 
     pub fn parse(s: &str) -> Result<NorwegianTin, NorwegianTinError> {
         let bytes = s.as_bytes();
-        if bytes.len() != TIN_LENGTH {
+        if bytes.len() != TIN_LENGTH && bytes.len() != ORG_LENGTH {
             return Err(NorwegianTinError::InvalidLength);
         }
+
         let mut digits = [0u8; TIN_LENGTH];
         for (i, &b) in bytes.iter().enumerate() {
             if b < b'0' || b > b'9' {
@@ -107,6 +117,23 @@ impl NorwegianTin {
             }
             digits[i] = b - b'0';
         }
+        if bytes.len() == ORG_LENGTH {
+            let _ =
+                Self::calculate_checksum(
+                    &digits[0..8],
+                    SEQUENCE_ORG_CHECKSUM_DIGITS,
+                    |r| match (11 - r) % 11 {
+                        10 => Err(NorwegianTinError::InvalidChecksum),
+                        v if v == digits[8] => Ok(()),
+                        _ => Err(NorwegianTinError::InvalidChecksum),
+                    },
+                )?;
+
+            return Ok(NorwegianTin::OrgNumber(OrgNumber {
+                value: digits[0..9].try_into().unwrap(),
+            }));
+        }
+
         let _ =
             Self::calculate_checksum(&digits[0..9], SEQUENCE_FIRST_CHECKSUM_DIGITS, |r| {
                 match (r + digits[9]) % 11 {
@@ -210,9 +237,9 @@ impl PersonKind {
     fn get_base_month(&self, month: u8) -> u8 {
         match self {
             PersonKind::Normal => month,
-            PersonKind::Synthetic => month - 80,
             PersonKind::HNumber => month - 40,
             PersonKind::Anonymous => month - 60,
+            PersonKind::Synthetic => month - 80,
         }
     }
 }
@@ -224,7 +251,7 @@ mod test {
     pub use super::*;
     #[test]
     fn test_invalid_length() {
-        let tins = vec!["123456789", "123456789012", "123", "12345678"];
+        let tins = vec!["0123456789", "123456789012", "123", "12345678",""];
         for tin in tins {
             assert_eq!(
                 NorwegianTin::parse(tin).unwrap_err(),
@@ -268,11 +295,9 @@ mod test {
 
     #[test]
     fn test_2032_format() {
-        let tins = vec!["11010000000","11010000019","11010000027","11010000035"];
+        let tins = vec!["11010000000", "11010000019", "11010000027", "11010000035"];
         for tin in tins {
-            
             assert!(NorwegianTin::parse(tin).is_ok());
-
         }
     }
 
@@ -542,4 +567,77 @@ mod test {
             );
         }
     }
+
+    #[test]
+    fn test_org_number() {
+        let orgs = vec![
+            "905661833",
+            "085649779",
+            "255399985",
+            "917766150",
+            "406099474",
+            "169994803",
+            "127412626",
+            "661532777",
+            "627143508",
+            "532464390",
+            "625711045",
+            "968668056",
+            "452238063",
+            "882897311",
+            "428621840",
+            "134511966",
+            "565768123",
+            "888302964",
+            "360559912",
+            "635203536",
+            "557117245",
+            "021244716",
+            "331370207",
+            "639703991",
+            "769676260",
+            "084416371",
+            "635606576",
+            "190537102",
+            "945867159",
+            "350759131",
+            "008303274",
+            "515559396",
+            "381740196",
+            "001686313",
+            "977279410",
+            "282720493",
+            "052965152",
+            "310958352",
+            "687739515",
+            "399784646",
+            "389213292",
+            "638522837",
+            "981000463",
+            "973289829",
+            "934708431",
+            "094979358",
+            "003221571",
+            "283978958",
+            "003437353",
+            "123480759",
+        ];
+        for org in orgs {
+            assert!(matches!(
+                NorwegianTin::parse(org).unwrap(),
+                NorwegianTin::OrgNumber(_)
+            ));
+        }
+    }
+    #[test]
+    fn test_org_number_invalid() {
+        let orgs = vec!["905661834", "085649778", "255399984", "917766151"];
+        for org in orgs {
+            assert_eq!(
+                NorwegianTin::parse(org).unwrap_err(),
+                NorwegianTinError::InvalidChecksum
+            );
+        }
+    }
+
 }
